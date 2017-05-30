@@ -1,22 +1,31 @@
 package main
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type Node struct {
-	Left  chan int
-	Up    chan int
-	Right chan int
-	Down  chan int
-	Acc   int
-	Bak   int
-	last  chan int
+	Left       chan int
+	Up         chan int
+	Right      chan int
+	Down       chan int
+	Acc        int
+	Bak        int
+	last       chan int
+	Statements []string
+	pc         int
 }
 
-type Port int //todo don't know if this is needed. Might just change funcs to accept chan int passed in
-
+type Port string //todo don't know if this is needed. Might just change funcs to accept chan int passed in
 const (
-	Left Port = iota
-	Up
-	Right
-	Down
+	Left  = "LEFT"
+	Up    = "UP"
+	Right = "RIGHT"
+	Down  = "DOWN"
+	Any   = "ANY"
+	Last  = "LAST"
 )
 
 func (n *Node) MovToPort(from Port, to Port) {
@@ -71,6 +80,10 @@ func (n *Node) Add(i int) {
 	n.Acc += i
 }
 
+func (n *Node) Sub(i int) {
+	n.Acc -= i
+}
+
 func (n *Node) ReadLast() int {
 	return <-n.last
 }
@@ -87,4 +100,74 @@ func (n *Node) Swp() {
 	n.Acc = n.Acc ^ n.Bak
 	n.Bak = n.Acc ^ n.Bak
 	n.Acc = n.Acc ^ n.Bak
+}
+
+func LinkLR(l, r *Node) {
+	c := make(chan int)
+	l.Right = c
+	r.Left = c
+}
+
+func LinkUD(u, d *Node) {
+	c := make(chan int)
+	u.Down = c
+	d.Up = c
+}
+
+func (n *Node) nextStatement() string {
+	s := n.Statements[n.pc]
+	n.pc++
+	if n.pc == len(n.Statements) {
+		n.pc = 0
+	}
+	return s
+}
+
+func (n *Node) mov(l, r string) {
+	lIsAcc := l == "ACC"
+	rIsAcc := r == "ACC"
+	if lIsAcc && rIsAcc {
+		panic("Two Acc in a MOV")
+	}
+	if lIsAcc {
+		n.MovFromAcc(Port(r))
+		return
+	}
+	if rIsAcc {
+		n.MovToAcc(Port(l))
+		return
+	}
+	n.MovToPort(Port(l), Port(r))
+}
+
+func (n *Node) Run() {
+	for {
+		s := n.nextStatement()
+		statement := strings.Split(s, " ")
+		if statement[0] == "MOV" {
+			n.mov(statement[1], statement[2])
+		}
+		if statement[0] == "ADD" {
+			p := Port(statement[1])
+			fmt.Println(p)
+			i, err := strconv.Atoi(statement[1])
+			if err != nil {
+				panic("ADD int can't be parsed: " + err.Error())
+			}
+			n.Add(i)
+		}
+		if statement[0] == "SWP" {
+			n.Swp()
+		}
+		if statement[0] == "SAV" {
+			n.Sav()
+		}
+		if statement[0] == "SUB" {
+			i, err := strconv.Atoi(statement[1])
+			if err == nil {
+				panic("SUB int can't be parsed")
+			}
+			n.Sub(i)
+		}
+	}
 }
