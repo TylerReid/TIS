@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -80,6 +79,11 @@ func (n *Node) Add(i int) {
 	n.Acc += i
 }
 
+func (n *Node) AddPort(p Port) {
+	i := <-n.portToChan(p)
+	n.Add(i)
+}
+
 func (n *Node) Sub(i int) {
 	n.Acc -= i
 }
@@ -148,13 +152,12 @@ func (n *Node) Run() {
 			n.mov(statement[1], statement[2])
 		}
 		if statement[0] == "ADD" {
-			p := Port(statement[1])
-			fmt.Println(p)
 			i, err := strconv.Atoi(statement[1])
 			if err != nil {
-				panic("ADD int can't be parsed: " + err.Error())
+				n.AddPort(Port(statement[1]))
+			} else {
+				n.Add(i)
 			}
-			n.Add(i)
 		}
 		if statement[0] == "SWP" {
 			n.Swp()
