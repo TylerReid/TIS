@@ -27,18 +27,18 @@ const (
 	Last  = "LAST"
 )
 
-func (n *Node) MovToPort(from Port, to Port) {
+func (n *Node) movToPort(from Port, to Port) {
 	f := n.portToChan(from)
 	t := n.portToChan(to)
 	t <- <-f
 }
 
-func (n *Node) MovToAcc(from Port) {
+func (n *Node) movToAcc(from Port) {
 	c := n.portToChan(from)
 	n.Acc = <-c
 }
 
-func (n *Node) MovFromAcc(to Port) {
+func (n *Node) movFromAcc(to Port) {
 	c := n.portToChan(to)
 	c <- n.Acc
 }
@@ -58,7 +58,7 @@ func (n *Node) portToChan(p Port) chan int {
 	panic(nil)
 }
 
-func (n *Node) ReadAny() int {
+func (n *Node) readAny() int {
 	select {
 	case i := <-n.Left:
 		n.last = n.Left
@@ -75,32 +75,55 @@ func (n *Node) ReadAny() int {
 	}
 }
 
-func (n *Node) Add(i int) {
+func (n *Node) add(s string) {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		n.addPort(Port(s))
+	} else {
+		n.addConst(i)
+	}
+}
+
+func (n *Node) addConst(i int) {
 	n.Acc += i
 }
 
-func (n *Node) AddPort(p Port) {
+func (n *Node) addPort(p Port) {
 	i := <-n.portToChan(p)
-	n.Add(i)
+	n.addConst(i)
 }
 
-func (n *Node) Sub(i int) {
+func (n *Node) sub(s string) {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		n.subPort(Port(s))
+	} else {
+		n.subConst(i)
+	}
+}
+
+func (n *Node) subConst(i int) {
 	n.Acc -= i
 }
 
-func (n *Node) ReadLast() int {
+func (n *Node) subPort(p Port) {
+	i := <-n.portToChan(p)
+	n.subConst(i)
+}
+
+func (n *Node) readLast() int {
 	return <-n.last
 }
 
-func (n *Node) WriteLast(i int) {
+func (n *Node) writeLast(i int) {
 	n.last <- i
 }
 
-func (n *Node) Sav() {
+func (n *Node) sav() {
 	n.Bak = n.Acc
 }
 
-func (n *Node) Swp() {
+func (n *Node) swp() {
 	n.Acc = n.Acc ^ n.Bak
 	n.Bak = n.Acc ^ n.Bak
 	n.Acc = n.Acc ^ n.Bak
@@ -134,43 +157,36 @@ func (n *Node) mov(l, r string) {
 		panic("Two Acc in a MOV")
 	}
 	if lIsAcc {
-		n.MovFromAcc(Port(r))
+		n.movFromAcc(Port(r))
 		return
 	}
 	if rIsAcc {
-		n.MovToAcc(Port(l))
+		n.movToAcc(Port(l))
 		return
 	}
-	n.MovToPort(Port(l), Port(r))
+	n.movToPort(Port(l), Port(r))
 }
 
 func (n *Node) Run() {
 	for {
 		s := n.nextStatement()
 		statement := strings.Split(s, " ")
-		if statement[0] == "MOV" {
+		instruction := statement[0]
+
+		if instruction == "MOV" {
 			n.mov(statement[1], statement[2])
 		}
-		if statement[0] == "ADD" {
-			i, err := strconv.Atoi(statement[1])
-			if err != nil {
-				n.AddPort(Port(statement[1]))
-			} else {
-				n.Add(i)
-			}
+		if instruction == "ADD" {
+			n.add(statement[1])
 		}
-		if statement[0] == "SWP" {
-			n.Swp()
+		if instruction == "SWP" {
+			n.swp()
 		}
-		if statement[0] == "SAV" {
-			n.Sav()
+		if instruction == "SAV" {
+			n.sav()
 		}
-		if statement[0] == "SUB" {
-			i, err := strconv.Atoi(statement[1])
-			if err == nil {
-				panic("SUB int can't be parsed")
-			}
-			n.Sub(i)
+		if instruction == "SUB" {
+			n.sub(statement[1])
 		}
 	}
 }
