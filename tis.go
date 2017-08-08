@@ -5,6 +5,22 @@ import (
 	"strings"
 )
 
+type Board struct {
+	Nodes []*Node
+}
+
+func (b *Board) Run() {
+	for _, n := range b.Nodes {
+		go n.run()
+	}
+}
+
+func (b *Board) Stop() {
+	for _, n := range b.Nodes {
+		n.stop()
+	}
+}
+
 type Node struct {
 	Left       chan int
 	Up         chan int
@@ -15,6 +31,7 @@ type Node struct {
 	last       chan int
 	Statements []string
 	pc         int
+	shouldStop chan bool
 }
 
 type Port string //todo don't know if this is needed. Might just change funcs to accept chan int passed in
@@ -167,26 +184,44 @@ func (n *Node) mov(l, r string) {
 	n.movToPort(Port(l), Port(r))
 }
 
-func (n *Node) Run() {
+func (n *Node) run() {
+	if n.shouldStop != nil {
+		n.shouldStop <- true
+	} else {
+		n.shouldStop = make(chan bool)
+	}
 	for {
-		s := n.nextStatement()
-		statement := strings.Split(s, " ")
-		instruction := statement[0]
+		select {
+		case stop := <-n.shouldStop:
+			if stop {
+				break
+			}
+		default:
+			s := n.nextStatement()
+			statement := strings.Split(s, " ")
+			instruction := statement[0]
 
-		if instruction == "MOV" {
-			n.mov(statement[1], statement[2])
+			if instruction == "MOV" {
+				n.mov(statement[1], statement[2])
+			}
+			if instruction == "ADD" {
+				n.add(statement[1])
+			}
+			if instruction == "SWP" {
+				n.swp()
+			}
+			if instruction == "SAV" {
+				n.sav()
+			}
+			if instruction == "SUB" {
+				n.sub(statement[1])
+			}
 		}
-		if instruction == "ADD" {
-			n.add(statement[1])
-		}
-		if instruction == "SWP" {
-			n.swp()
-		}
-		if instruction == "SAV" {
-			n.sav()
-		}
-		if instruction == "SUB" {
-			n.sub(statement[1])
-		}
+	}
+}
+
+func (n *Node) stop() {
+	if n.shouldStop != nil {
+		n.shouldStop <- true
 	}
 }
