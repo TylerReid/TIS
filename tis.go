@@ -1,24 +1,55 @@
 package main
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 )
 
 type Board struct {
-	Nodes []*Node
+	Nodes [][]*Node
+}
+
+func (b *Board) LinkNodes() {
+	for row := 0; row < len(b.Nodes); row++ {
+		for column := 0; column < len(b.Nodes[row]); column++ {
+			if column+1 != len(b.Nodes[row]) {
+				LinkLR(b.Nodes[row][column], b.Nodes[row][column+1])
+			}
+			if row+1 != len(b.Nodes) {
+				LinkUD(b.Nodes[row][column], b.Nodes[row+1][column])
+			}
+		}
+	}
 }
 
 func (b *Board) Run() {
-	for _, n := range b.Nodes {
-		go n.run()
+	for _, row := range b.Nodes {
+		for _, n := range row {
+			go n.run()
+		}
 	}
 }
 
 func (b *Board) Stop() {
-	for _, n := range b.Nodes {
-		n.stop()
+	for _, row := range b.Nodes {
+		for _, n := range row {
+			go n.stop()
+		}
 	}
+}
+
+func (b *Board) Print() string {
+	var sb bytes.Buffer
+	for _, row := range b.Nodes {
+		for _, n := range row {
+			sb.WriteString("Acc:")
+			sb.WriteString(strconv.Itoa(n.Acc))
+			sb.WriteString("\t")
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 type Node struct {
@@ -33,6 +64,9 @@ type Node struct {
 	pc         int
 	shouldStop chan bool
 }
+
+//todo check for a better and idomatic way of doing this
+var EmptyNode = &Node{}
 
 type Port string //todo don't know if this is needed. Might just change funcs to accept chan int passed in
 const (
@@ -167,6 +201,13 @@ func (n *Node) nextStatement() string {
 	return s
 }
 
+func (n *Node) CurrentStatement() string {
+	if len(n.Statements) > 0 {
+		return n.Statements[n.pc]
+	}
+	return ""
+}
+
 func (n *Node) mov(l, r string) {
 	lIsAcc := l == "ACC"
 	rIsAcc := r == "ACC"
@@ -185,6 +226,9 @@ func (n *Node) mov(l, r string) {
 }
 
 func (n *Node) run() {
+	if n == EmptyNode {
+		return
+	}
 	if n.shouldStop != nil {
 		n.shouldStop <- true
 	} else {

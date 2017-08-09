@@ -16,12 +16,13 @@ func main() {
 	cStatements := []string{"MOV UP ACC", "MOV ACC UP"}
 	c := Node{Statements: cStatements}
 
-	nodes := []*Node{&a, &b, &c}
+	nodes := [][]*Node{
+		{&a, &b},
+		{&c, EmptyNode},
+	}
+
 	board := Board{Nodes: nodes}
-
-	LinkLR(&a, &b)
-	LinkUD(&a, &c)
-
+	board.LinkNodes()
 	board.Run()
 
 	go func() {
@@ -35,6 +36,7 @@ func main() {
 		time.Sleep(time.Second)
 		select {
 		case o := <-out:
+			fmt.Println(board.Print())
 			fmt.Println(o)
 		default:
 		}
